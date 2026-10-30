@@ -1,0 +1,2 @@
+# The bot, backtests and Alpaca paper mode use only the Python standard library (3.11+).
+# Tests: pip install pytest

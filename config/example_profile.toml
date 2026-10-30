@@ -1,0 +1,105 @@
+# EXAMPLE style profile. Every number below is a placeholder chosen for illustration only.
+# Copy this file, set your own risk settings, and point the bot at it with MIMIC_BOT_CONFIG=path/to/your.toml.
+# Paper trading only. Nothing here is a recommendation.
+#
+# Profiles:
+#   "mimic"       = loose comparison profile (most guardrails off) used by `run.py compare`
+#   "disciplined" = strict profile: few trades, cooldowns, hard stop, fixed exits
+#   "active"      = default for `python run.py --paper`: all-session index trading with the trim-ladder exit
+
+[universe]
+# relative trade-count weights (example)
+weights = { SPY = 3, QQQ = 2, IWM = 1 }
+
+[contract]
+structure = "single_leg_long"     # buy-to-open calls/puts only
+call_share = 0.55                 # example
+dte_target = 0                    # 0DTE
+otm_pct_target = 0.20             # strike target, % out of the money
+premium_min = 0.45                # skip premiums under this (example)
+premium_max = 2.00                # move the strike further OTM above this (example)
+premium_median_observed = 0.90
+
+[sizing]
+cost_per_trade_median = 150       # $ premium budget per trade for the simple fade signal (example)
+contracts_median = 2
+contracts_max_observed = 5
+
+[entry]
+style = "fade"
+fade_min_move_pct = 0.10          # underlying must have moved >= this % against the trade over the prior 30 min
+best_windows_et = ["10:00-13:00"]
+avoid_windows_et = ["09:30-10:00", "15:00-16:00"]
+
+[exit]
+profit_target_pct = 0.20          # "target" exit plan only (example)
+# REQUIRED. Set your own risk settings. Negative fraction of the entry premium, e.g. -0.25 = sell if the
+# option loses 25% of what you paid. The bot refuses to start without it. -0.25 is only an example.
+stop_loss_pct = -0.25
+time_stop_min = 15                # "target" exit plan only (example)
+flat_by_close = true
+
+[profiles.mimic]
+max_trades_per_session = 6
+reentry_cooldown_after_loss_min = 0
+size_mult_after_loss = 1.25
+allow_opening_30min = true
+allow_last_hour = true
+allow_lottery_premium = true
+honor_stop = false
+allow_earnings_hold = true
+take_prob = 0.15                  # backtest only: share of signals the loose profile takes
+
+[profiles.disciplined]
+max_trades_per_session = 3
+reentry_cooldown_after_loss_min = 10
+size_mult_after_loss = 1.0
+allow_opening_30min = false
+allow_last_hour = false
+allow_lottery_premium = false
+honor_stop = true
+allow_earnings_hold = false
+max_risk_pct_of_account = 0.02    # planned risk = |stop_loss_pct| x premium x contracts
+max_trades_per_symbol_per_day = { SPY = 1 }
+no_size_up_after_loss = true
+
+[profiles.active]
+# Default for `python run.py --paper`. Alpaca PAPER only.
+watchlist = ["SPY", "QQQ", "IWM", "XSP"]   # XSP = mini-SPX (1/10 size, cash-settled)
+max_trades_per_session = 20
+max_open_per_symbol = 1
+reentry_cooldown_after_loss_min = 5
+size_mult_after_loss = 1.0
+no_size_up_after_loss = true
+# stop_loss_pct = -0.25                    # optional per-profile override of [exit].stop_loss_pct
+min_entries_per_hour = 1                   # if no entry yet this hour by :30, take the best signal under min_score (>= hourly_catchup_min_score)
+hourly_catchup_after_min = 30
+hourly_catchup_until_et = "11:00"          # catch-up only until this ET time
+hourly_catchup_min_score = 0.48
+hourly_catchup_size_mult = 0.6             # catch-up entries are sized smaller
+hourly_catchup_after_loss = false          # no catch-up while today's last closed trade is a loss
+momentum_needs_spy_above_200d = true       # momentum entries only when SPY > 200-day average
+portfolio_fraction = 0.05                  # premium spent per entry as a share of paper equity (example)
+allow_opening_30min = false
+allow_last_hour = false
+entry_start_et = "09:45"
+entry_end_et = "15:10"                     # last entry; everything is flattened at 15:25 ET
+signal_cooldown_min = 10
+min_score = 0.56                           # 0-1 setup score floor (mimic_bot/ranking.py)
+min_gap_between_entries_min = 10
+allow_lottery_premium = false
+honor_stop = true
+allow_earnings_hold = false
+max_trades_per_symbol_per_day = {}
+# Exit plan (replaces the target / time stop for this profile; the 15:25 ET flatten still applies):
+exit_plan = "ladder"
+time_stop_min = 0
+trim_ladder_gains = [0.25, 0.60, 0.75, 1.00, 1.50, 2.00, 5.00, 10.00, 20.00]
+trim_fractions = [0.50, 0.25]              # share of the original qty sold at the first two rungs; the rest is split evenly
+trail_arm_pct = 0.75                       # trailing stop arms at this gain
+trail_pct = 0.60                           # ...and trails this far below the peak bid (only ratchets up)
+daily_loss_limit_pct = 0.10                # no new entries once today's realized loss hits this share of equity
+
+[account]
+paper_starting_equity = 100000    # only used before the first sync with the paper account
+pdt_equity_threshold = 25000
